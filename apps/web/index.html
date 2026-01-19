@@ -1,96 +1,173 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Apologia POC</title>
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
-  <body>
-    <div class="app">
-      <header class="hero">
-        <div>
-          <p class="eyebrow">Apologia POC</p>
-          <h1>Review-first sermon refinement.</h1>
-          <p class="subhead">
-            Upload a sermon, review AI suggestions, accept only what you approve, and
-            export a revised PPTX.
-          </p>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apologia – Sermon Refinement</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Login Modal -->
+  <div id="loginModal" class="modal active">
+    <div class="modal-content">
+      <h2>Apologia</h2>
+      <p>Enter your name to get started</p>
+      <form id="loginForm">
+        <input id="loginPastorName" type="text" placeholder="Your name" required autocomplete="off"/>
+        <button type="submit" class="btn btn-primary">Sign In</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Navbar -->
+  <nav id="navbar" class="navbar">
+    <div class="navbar-left">
+      <h1 class="logo">Apologia</h1>
+    </div>
+    <div class="navbar-center">
+      <span id="apiStatusDot" class="status-dot offline"></span>
+      <span id="apiStatusText" class="api-status">Offline</span>
+    </div>
+    <div class="navbar-right">
+      <span id="navbarUser" class="navbar-user"></span>
+      <button id="navbarLogoutBtn" class="btn btn-secondary">Logout</button>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main id="mainContent" class="main-content" style="display: none;">
+    <!-- Home Page -->
+    <div id="homePage" class="page">
+      <div class="page-header">
+        <h2>Sermons</h2>
+        <button id="uploadBtn" class="btn btn-primary">Upload Sermon</button>
+      </div>
+
+      <!-- Sermons Table -->
+      <div id="sermonsList" class="sermons-table">
+        <div class="table-header">
+          <div class="col col-name">
+            <div class="col-label">Sermon Name</div>
+            <input id="filterName" type="text" placeholder="Filter..." class="filter-input"/>
+          </div>
+          <div class="col col-series">
+            <div class="col-label">Series</div>
+            <input id="filterSeries" type="text" placeholder="Filter..." class="filter-input"/>
+          </div>
+          <div class="col col-date">
+            <div class="col-label">Date</div>
+            <input id="filterDate" type="text" placeholder="Filter..." class="filter-input"/>
+          </div>
+          <div class="col col-pastor">
+            <div class="col-label">Pastor</div>
+            <input id="filterPastor" type="text" placeholder="Filter..." class="filter-input"/>
+          </div>
+          <div class="col col-status">
+            <div class="col-label">Status</div>
+            <select id="filterStatus" class="filter-input">
+              <option value="">All</option>
+              <option value="uploaded">Uploaded</option>
+              <option value="reviewed">Reviewed</option>
+              <option value="generated">Generated</option>
+            </select>
+          </div>
+          <div class="col col-actions">
+            <div class="col-label">Actions</div>
+          </div>
         </div>
-        <div class="status-card">
-          <p class="label">API Status</p>
-          <div class="status" id="apiStatus">Checking...</div>
-          <p class="hint">Backend expected at http://127.0.0.1:8000</p>
-        </div>
-      </header>
-
-      <main class="grid">
-        <section class="panel">
-          <h2>Upload Sermon</h2>
-          <form id="uploadForm">
-            <label>
-              Sermon Name
-              <input type="text" name="sermonName" required />
-            </label>
-            <label>
-              Series Name
-              <input type="text" name="seriesName" />
-            </label>
-            <label>
-              Week / Date
-              <input type="text" name="weekOrDate" />
-            </label>
-            <label>
-              Pastor Name
-              <input type="text" name="pastorName" />
-            </label>
-            <label class="file">
-              PPTX File
-              <input type="file" name="file" accept=".pptx" required />
-            </label>
-            <button type="submit">Upload</button>
-          </form>
-          <p class="muted" id="uploadStatus"></p>
-        </section>
-
-        <section class="panel">
-          <div class="panel-header">
-            <h2>Sermons</h2>
-            <button id="refreshSermons">Refresh</button>
-          </div>
-          <div class="table" id="sermonTable"></div>
-        </section>
-
-        <section class="panel wide">
-          <div class="panel-header">
-            <h2>Review</h2>
-            <div class="actions">
-              <button id="analyzeSlide">Analyze Slide</button>
-              <button id="saveDecisions">Save Decisions</button>
-            </div>
-          </div>
-          <div class="review">
-            <aside id="slideList" class="slide-list"></aside>
-            <div class="review-main">
-              <div class="slide-text" id="slideText"></div>
-              <div class="suggestions" id="suggestions"></div>
-            </div>
-          </div>
-          <p class="muted" id="reviewStatus"></p>
-        </section>
-
-        <section class="panel">
-          <h2>Generate & Download</h2>
-          <p class="muted">
-            Generates a revised PPTX from accepted edits only. No changes are
-            applied without approval.
-          </p>
-          <button id="generatePptx">Generate Updated PPTX</button>
-          <a id="downloadLink" class="download hidden" href="#">Download</a>
-        </section>
-      </main>
+        <div id="sermonTableBody" class="table-body"></div>
+      </div>
     </div>
 
-    <script src="./app.js"></script>
-  </body>
+    <!-- Review Page (hidden by default) -->
+    <div id="reviewPage" class="page" style="display: none;">
+      <div class="review-header">
+        <button id="backBtn" class="btn btn-secondary">← Back</button>
+        <h2 id="reviewTitle">Review</h2>
+        <div class="review-actions">
+          <button id="analyzeBtn" class="btn btn-secondary">Analyze Slide</button>
+          <button id="saveChangesBtn" class="btn btn-secondary">Save Changes</button>
+          <button id="generatePptxBtn" class="btn btn-primary">Generate PPTX</button>
+          <a id="downloadPptxLink" class="btn btn-success" style="display: none;">Download</a>
+        </div>
+      </div>
+
+      <div class="review-container">
+        <!-- Left: Slide Viewer -->
+        <div class="slide-viewer">
+          <div id="slidePreview" class="slide-preview">
+            <p>Slide preview will appear here</p>
+          </div>
+          <div class="slide-controls">
+            <button id="prevSlideBtn" class="btn btn-secondary">← Prev</button>
+            <span id="slideCounter" class="slide-counter">Slide 1 of 0</span>
+            <button id="nextSlideBtn" class="btn btn-secondary">Next →</button>
+          </div>
+          <div id="slideList" class="slide-list"></div>
+        </div>
+
+        <!-- Right: Suggestions Panel -->
+        <div class="suggestions-panel">
+          <h3>Suggestions</h3>
+          <div id="suggestionsContainer" class="suggestions-container">
+            <p class="empty-state">Suggestions will appear here after analysis.</p>
+          </div>
+          <div id="reviewStatus" class="review-status"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Upload Modal -->
+  <div id="uploadModal" class="modal">
+    <div class="modal-content modal-lg">
+      <div class="modal-header">
+        <h3>Upload Sermon</h3>
+        <button id="closeUploadBtn" class="btn-close">✕</button>
+      </div>
+      <form id="uploadForm" class="upload-form">
+        <div class="form-group">
+          <label for="sermonNameInput">Sermon Name *</label>
+          <input id="sermonNameInput" type="text" name="sermonName" placeholder="e.g., Hope in Christ" required/>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="seriesNameInput">Series Name</label>
+            <input id="seriesNameInput" type="text" name="seriesName" placeholder="e.g., Philippians"/>
+          </div>
+          <div class="form-group">
+            <label for="weekOrDateInput">Week/Date</label>
+            <input id="weekOrDateInput" type="date" name="weekOrDate"/>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="pastorNameInput">Pastor Name</label>
+          <input id="pastorNameInput" type="text" name="pastorName" placeholder="e.g., Pastor John"/>
+        </div>
+
+        <div class="form-group">
+          <label for="fileInput">PPTX File *</label>
+          <div id="fileDropZone" class="file-dropzone">
+            <p>Drag and drop your PPTX file here, or click to browse</p>
+            <input id="fileInput" type="file" name="file" accept=".pptx" style="display: none;" required/>
+          </div>
+        </div>
+
+        <div id="uploadStatus" class="upload-status"></div>
+
+        <div class="form-actions">
+          <button type="button" id="cancelUploadBtn" class="btn btn-secondary">Cancel</button>
+          <button type="submit" class="btn btn-primary">Upload Sermon</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Overlay for modals -->
+  <div id="modalOverlay" class="modal-overlay"></div>
+
+  <script src="app.js"></script>
+</body>
 </html>
