@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Apologia POC</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Apologia POC</p>
+          <h1>Review-first sermon refinement.</h1>
+          <p class="subhead">
+            Upload a sermon, review AI suggestions, accept only what you approve, and
+            export a revised PPTX.
+          </p>
+        </div>
+        <div class="status-card">
+          <p class="label">API Status</p>
+          <div class="status" id="apiStatus">Checking...</div>
+          <p class="hint">Backend expected at http://127.0.0.1:8000</p>
+        </div>
+      </header>
+
+      <main class="grid">
+        <section class="panel">
+          <h2>Upload Sermon</h2>
+          <form id="uploadForm">
+            <label>
+              Sermon Name
+              <input type="text" name="sermonName" required />
+            </label>
+            <label>
+              Series Name
+              <input type="text" name="seriesName" />
+            </label>
+            <label>
+              Week / Date
+              <input type="text" name="weekOrDate" />
+            </label>
+            <label>
+              Pastor Name
+              <input type="text" name="pastorName" />
+            </label>
+            <label class="file">
+              PPTX File
+              <input type="file" name="file" accept=".pptx" required />
+            </label>
+            <button type="submit">Upload</button>
+          </form>
+          <p class="muted" id="uploadStatus"></p>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2>Sermons</h2>
+            <button id="refreshSermons">Refresh</button>
+          </div>
+          <div class="table" id="sermonTable"></div>
+        </section>
+
+        <section class="panel wide">
+          <div class="panel-header">
+            <h2>Review</h2>
+            <div class="actions">
+              <button id="analyzeSlide">Analyze Slide</button>
+              <button id="saveDecisions">Save Decisions</button>
+            </div>
+          </div>
+          <div class="review">
+            <aside id="slideList" class="slide-list"></aside>
+            <div class="review-main">
+              <div class="slide-text" id="slideText"></div>
+              <div class="suggestions" id="suggestions"></div>
+            </div>
+          </div>
+          <p class="muted" id="reviewStatus"></p>
+        </section>
+
+        <section class="panel">
+          <h2>Generate & Download</h2>
+          <p class="muted">
+            Generates a revised PPTX from accepted edits only. No changes are
+            applied without approval.
+          </p>
+          <button id="generatePptx">Generate Updated PPTX</button>
+          <a id="downloadLink" class="download hidden" href="#">Download</a>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
