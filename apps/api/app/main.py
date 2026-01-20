@@ -8,7 +8,9 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, sta
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pptx import Presentation
+from dotenv import load_dotenv
 
+from .bedrock import BedrockAgentError, analyze_slide_text
 from .config import STORAGE_DIR, UPLOAD_DIR
 from .db import get_db, init_db
 from .schemas import (
@@ -24,6 +26,7 @@ from .schemas import (
 from .state import init_sermon_state, load_analysis, load_decisions, save_analysis, save_decisions
 
 app = FastAPI(title="Apologia API", version="0.1.0")
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -242,9 +245,15 @@ def analyze_slide(
     except IndexError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
-    original_text = _extract_slide_text(slide)
-    suggestions = _analyze_text_stub(original_text)
     slide_id = f"{sermon_id}:{slide_number}"
+    original_text = _extract_slide_text(slide)
+    try:
+        suggestions = analyze_slide_text(slide_id, original_text)
+    except (BedrockAgentError, ValueError, KeyError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Bedrock analysis failed: {exc}",
+        ) from exc
     analysis = SlideAnalysis(
         slideId=slide_id,
         slideNumber=slide_number,
@@ -345,17 +354,27 @@ def _output_pptx_path(sermon_id: str) -> Path:
     return STORAGE_DIR / "sermons" / sermon_id / "output.pptx"
 
 
+def _replace_in_text_frame(text_frame, replacements: List[tuple[str, str]]) -> None:
+    for paragraph in text_frame.paragraphs:
+        for original, replacement in replacements:
+            if not original or original not in paragraph.text:
+                continue
+            replaced_in_runs = False
+            for run in paragraph.runs:
+                if original in run.text:
+                    run.text = run.text.replace(original, replacement)
+                    replaced_in_runs = True
+            if not replaced_in_runs:
+                updated = paragraph.text.replace(original, replacement)
+                if updated != paragraph.text:
+                    paragraph.text = updated
+
+
 def _apply_text_replacements(slide, replacements: List[tuple[str, str]]) -> None:
     for shape in slide.shapes:
         if not getattr(shape, "has_text_frame", False):
             continue
-        text = shape.text or ""
-        updated = text
-        for original, replacement in replacements:
-            if original:
-                updated = updated.replace(original, replacement)
-        if updated != text:
-            shape.text = updated
+        _replace_in_text_frame(shape.text_frame, replacements)
 
     try:
         notes_frame = slide.notes_slide.notes_text_frame
@@ -363,13 +382,7 @@ def _apply_text_replacements(slide, replacements: List[tuple[str, str]]) -> None
         notes_frame = None
 
     if notes_frame is not None:
-        text = notes_frame.text or ""
-        updated = text
-        for original, replacement in replacements:
-            if original:
-                updated = updated.replace(original, replacement)
-        if updated != text:
-            notes_frame.text = updated
+        _replace_in_text_frame(notes_frame, replacements)
 
 
 @app.post("/sermons/{sermon_id}/generate-updated-pptx")

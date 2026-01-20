@@ -16,6 +16,7 @@ const loginForm = document.getElementById("loginForm");
 const mainContent = document.getElementById("mainContent");
 const navbarUser = document.getElementById("navbarUser");
 const navbarLogoutBtn = document.getElementById("navbarLogoutBtn");
+const userMenuDropdown = document.getElementById("userMenuDropdown");
 const apiStatusDot = document.getElementById("apiStatusDot");
 const apiStatusText = document.getElementById("apiStatusText");
 
@@ -50,6 +51,7 @@ const reviewPage = document.getElementById("reviewPage");
 const backBtn = document.getElementById("backBtn");
 const reviewTitle = document.getElementById("reviewTitle");
 const analyzeBtn = document.getElementById("analyzeBtn");
+const analyzeAllBtn = document.getElementById("analyzeAllBtn");
 const saveChangesBtn = document.getElementById("saveChangesBtn");
 const generatePptxBtn = document.getElementById("generatePptxBtn");
 const downloadPptxLink = document.getElementById("downloadPptxLink");
@@ -59,6 +61,7 @@ const reviewStatus = document.getElementById("reviewStatus");
 const slideCounter = document.getElementById("slideCounter");
 const prevSlideBtn = document.getElementById("prevSlideBtn");
 const nextSlideBtn = document.getElementById("nextSlideBtn");
+const toastContainer = document.getElementById("toastContainer");
 
 // Authentication
 function checkLogin() {
@@ -101,7 +104,28 @@ loginForm.addEventListener("submit", (e) => {
 navbarLogoutBtn.addEventListener("click", () => {
   localStorage.removeItem("pastorName");
   state.currentPastor = null;
+  userMenuDropdown.classList.remove("open");
   showLoginModal();
+});
+
+navbarUser.addEventListener("click", (event) => {
+  event.stopPropagation();
+  userMenuDropdown.classList.toggle("open");
+});
+
+document.addEventListener("click", (event) => {
+  if (!userMenuDropdown.classList.contains("open")) {
+    return;
+  }
+  if (!event.target.closest(".user-menu")) {
+    userMenuDropdown.classList.remove("open");
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    userMenuDropdown.classList.remove("open");
+  }
 });
 
 // Logo click to go back to home
@@ -295,9 +319,17 @@ uploadForm.addEventListener("submit", async (e) => {
 // Navigation to Review Page
 function navigateToReview(sermonId, sermonName) {
   state.selectedSermonId = sermonId;
+  state.slides = [];
+  state.analysisBySlideId = {};
+  state.decisionsBySlideId = {};
+  state.selectedSlideNumber = null;
   reviewTitle.textContent = sermonName;
   homePage.style.display = "none";
   reviewPage.style.display = "block";
+  reviewStatus.textContent = "Loading sermon...";
+  slideList.innerHTML = "";
+  slidePreview.innerHTML = '<p class="empty-state">Loading slides...</p>';
+  suggestionsContainer.innerHTML = '<p class="empty-state">Loading suggestions...</p>';
   loadSermonReview(sermonId);
 }
 
@@ -306,6 +338,14 @@ function backToHome() {
   reviewPage.style.display = "none";
   state.selectedSermonId = null;
   state.slides = [];
+  state.analysisBySlideId = {};
+  state.decisionsBySlideId = {};
+  state.selectedSlideNumber = null;
+  reviewStatus.textContent = "";
+  slideList.innerHTML = "";
+  slidePreview.innerHTML = '<p class="empty-state">Select a slide</p>';
+  suggestionsContainer.innerHTML = '<p class="empty-state">Select a slide</p>';
+  slideCounter.textContent = "Slide 1 of 0";
 }
 
 backBtn.addEventListener("click", backToHome);
@@ -326,6 +366,7 @@ async function loadSermonReview(sermonId) {
     
     renderSlideList();
     renderSlideDetails();
+    reviewStatus.textContent = "";
   } catch (error) {
     reviewStatus.textContent = "Unable to load review data: " + error.message;
   }
@@ -421,12 +462,15 @@ function renderSlideDetails() {
     const decision = decisionMap[suggestion.id] || {};
     const card = document.createElement("div");
     card.className = "suggestion-card";
+    const proposedValue =
+      decision.decision === "edited" && (decision.finalText || "").trim()
+        ? decision.finalText
+        : suggestion.proposed;
     card.innerHTML = `
       <h4>${suggestion.category}</h4>
       <p><strong>Original:</strong> ${suggestion.original}</p>
-      <p><strong>Proposed:</strong> ${suggestion.proposed}</p>
+      <p class="proposed-text"><strong>Proposed:</strong> ${proposedValue}</p>
       ${suggestion.explanation ? `<p><strong>Note:</strong> ${suggestion.explanation}</p>` : ""}
-      <p><strong>Confidence:</strong> ${suggestion.confidence != null ? (suggestion.confidence * 100).toFixed(0) + "%" : "-"}</p>
     `;
     
     const actions = document.createElement("div");
@@ -436,7 +480,13 @@ function renderSlideDetails() {
     acceptBtn.textContent = "Accept";
     acceptBtn.className = decision.decision === "accepted" ? "btn btn-sm btn-success" : "btn btn-sm btn-secondary";
     acceptBtn.addEventListener("click", () => {
-      setDecision(slideId, suggestion.id, "accepted", "");
+      const currentDecision = ensureDecisionMap(slideId)[suggestion.id] || {};
+      const editedText = (currentDecision.finalText || "").trim();
+      if (editedText) {
+        setDecision(slideId, suggestion.id, "edited", editedText);
+      } else {
+        setDecision(slideId, suggestion.id, "accepted", "");
+      }
       renderSlideDetails();
     });
 
@@ -452,14 +502,48 @@ function renderSlideDetails() {
     editBtn.textContent = "Edit";
     editBtn.className = decision.decision === "edited" ? "btn btn-sm btn-success" : "btn btn-sm btn-secondary";
     editBtn.addEventListener("click", () => {
-      setDecision(slideId, suggestion.id, "edited", suggestion.proposed);
+      const nextText = (decision.finalText || suggestion.proposed || "").trim();
+      setDecision(slideId, suggestion.id, "edited", nextText);
       renderSlideDetails();
     });
+
+    const editInput = document.createElement("input");
+    editInput.type = "text";
+    editInput.className = "suggestion-input";
+    editInput.placeholder = "Edit proposed text";
+    editInput.value = decision.finalText || "";
+    const isEditing = decision.decision === "edited";
+    editInput.disabled = !isEditing;
+    editInput.style.display = isEditing ? "block" : "none";
+    editInput.addEventListener("input", (event) => {
+      setDecision(slideId, suggestion.id, "edited", event.target.value);
+      updateProposedValue(card, event.target.value);
+    });
+    card.appendChild(editInput);
 
     actions.appendChild(acceptBtn);
     actions.appendChild(rejectBtn);
     actions.appendChild(editBtn);
     card.appendChild(actions);
+
+    const confidence = document.createElement("div");
+    confidence.className = "confidence";
+    if (suggestion.confidence != null) {
+      const raw = Number(suggestion.confidence);
+      const percent = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
+      confidence.textContent = `Confidence: ${percent}%`;
+      if (percent >= 80) {
+        confidence.classList.add("confidence--high");
+      } else if (percent >= 50) {
+        confidence.classList.add("confidence--med");
+      } else {
+        confidence.classList.add("confidence--low");
+      }
+    } else {
+      confidence.textContent = "Confidence: -";
+      confidence.classList.add("confidence--low");
+    }
+    card.appendChild(confidence);
     suggestionsContainer.appendChild(card);
   });
 }
@@ -474,6 +558,29 @@ function ensureDecisionMap(slideId) {
 function setDecision(slideId, suggestionId, decision, finalText) {
   const map = ensureDecisionMap(slideId);
   map[suggestionId] = { decision, finalText };
+}
+
+function updateProposedValue(card, text) {
+  const proposed = card.querySelector(".proposed-text");
+  if (!proposed) {
+    return;
+  }
+  const safeText = text && text.trim() ? text : "—";
+  proposed.innerHTML = `<strong>Proposed:</strong> ${safeText}`;
+}
+
+function showToast(message, variant = "success") {
+  if (!toastContainer) {
+    return;
+  }
+  const toast = document.createElement("div");
+  toast.className = `toast toast--${variant}`;
+  toast.textContent = message;
+  toastContainer.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add("fade-out");
+    setTimeout(() => toast.remove(), 300);
+  }, 2400);
 }
 
 // Slide Navigation
@@ -509,8 +616,41 @@ analyzeBtn.addEventListener("click", async () => {
     state.analysisBySlideId[analysis.slideId] = analysis;
     reviewStatus.textContent = "";
     renderSlideDetails();
+    renderSlideList();
   } catch (error) {
     reviewStatus.textContent = "Analysis failed: " + error.message;
+  }
+});
+
+analyzeAllBtn.addEventListener("click", async () => {
+  if (!state.selectedSermonId) {
+    reviewStatus.textContent = "Select a sermon first";
+    return;
+  }
+  if (!state.slides.length) {
+    reviewStatus.textContent = "No slides to analyze";
+    return;
+  }
+  analyzeAllBtn.disabled = true;
+  analyzeBtn.disabled = true;
+  reviewStatus.textContent = "Analyzing all slides...";
+  try {
+    for (const slide of state.slides) {
+      const analysis = await apiFetch(
+        `/sermons/${state.selectedSermonId}/slides/${slide.slideNumber}/analyze`,
+        { method: "POST" }
+      );
+      state.analysisBySlideId[analysis.slideId] = analysis;
+      renderSlideList();
+    }
+    reviewStatus.textContent = "";
+    showToast("All slides analyzed.");
+  } catch (error) {
+    reviewStatus.textContent = "Analyze all failed: " + error.message;
+  } finally {
+    analyzeAllBtn.disabled = false;
+    analyzeBtn.disabled = false;
+    renderSlideDetails();
   }
 });
 
@@ -545,6 +685,8 @@ saveChangesBtn.addEventListener("click", async () => {
     );
     reviewStatus.textContent = "Decisions saved!";
     setTimeout(() => { reviewStatus.textContent = ""; }, 2000);
+    renderSlideList();
+    showToast("Changes saved.");
   } catch (error) {
     reviewStatus.textContent = "Save failed: " + error.message;
   }
@@ -566,6 +708,7 @@ generatePptxBtn.addEventListener("click", async () => {
     downloadPptxLink.href = href;
     downloadPptxLink.style.display = "inline-block";
     reviewStatus.textContent = "";
+    showToast("PPTX generated.");
   } catch (error) {
     reviewStatus.textContent = "Generation failed: " + error.message;
   }

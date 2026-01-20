@@ -29,8 +29,14 @@
       <span id="apiStatusText" class="api-status">Offline</span>
     </div>
     <div class="navbar-right">
-      <span id="navbarUser" class="navbar-user"></span>
-      <button id="navbarLogoutBtn" class="btn btn-secondary">Logout</button>
+      <div class="user-menu">
+        <button id="navbarUser" class="user-trigger" type="button"></button>
+        <div id="userMenuDropdown" class="user-dropdown">
+          <button class="dropdown-item dropdown-item--disabled" type="button" disabled>Profile</button>
+          <button class="dropdown-item dropdown-item--disabled" type="button" disabled>Settings</button>
+          <button id="navbarLogoutBtn" class="dropdown-item" type="button">Logout</button>
+        </div>
+      </div>
     </div>
   </nav>
 
@@ -86,6 +92,7 @@
         <h2 id="reviewTitle">Review</h2>
         <div class="review-actions">
           <button id="analyzeBtn" class="btn btn-secondary">Analyze Slide</button>
+          <button id="analyzeAllBtn" class="btn btn-secondary">Analyze All</button>
           <button id="saveChangesBtn" class="btn btn-secondary">Save Changes</button>
           <button id="generatePptxBtn" class="btn btn-primary">Generate PPTX</button>
           <a id="downloadPptxLink" class="btn btn-success" style="display: none;">Download</a>
@@ -167,6 +174,7 @@
 
   <!-- Overlay for modals -->
   <div id="modalOverlay" class="modal-overlay"></div>
+  <div id="toastContainer" class="toast-container"></div>
 
   <script src="app.js"></script>
 </body>

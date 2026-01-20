@@ -5,6 +5,22 @@ simple flow to upload sermon PPTX files and list stored sermons (metadata +
 file path). Slide extraction and AI-assisted processing will be layered on
 later milestones.
 
+## Configuration (Required for Bedrock)
+
+The analyzer uses Amazon Bedrock Agents. Do NOT commit secrets.
+
+Create a local `apps/api/.env` file (gitignored) with:
+
+```
+AWS_REGION=us-east-1
+BEDROCK_AGENT_ID=your_agent_id
+BEDROCK_AGENT_ALIAS_ID=your_alias_id
+```
+
+You also need AWS credentials on your machine (e.g. `aws configure`).
+If these are missing or invalid, the `/analyze` endpoint will fail with
+access errors.
+
 ## Getting Started
 
 ```bash
