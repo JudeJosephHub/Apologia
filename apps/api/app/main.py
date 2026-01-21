@@ -41,6 +41,11 @@ def startup_event() -> None:
     init_db()
 
 
+@app.get("/health")
+def health_check() -> dict:
+    return {"ok": True}
+
+
 def _ensure_pptx(file: UploadFile) -> None:
     filename = file.filename or ""
     if not filename.lower().endswith(".pptx"):
