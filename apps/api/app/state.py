@@ -1,9 +1,10 @@
 from datetime import datetime
+import json
 from pathlib import Path
 from typing import Type, TypeVar
 
 from .config import STORAGE_DIR
-from .schemas import AnalysisDocument, DecisionsDocument
+from .schemas import AnalysisDocument, DecisionsDocument, TranscriptDocument
 
 SERMONS_DIR = STORAGE_DIR / "sermons"
 
@@ -38,6 +39,10 @@ def decisions_path(sermon_id: str) -> Path:
     return sermon_state_dir(sermon_id) / "decisions.json"
 
 
+def transcript_path(sermon_id: str) -> Path:
+    return sermon_state_dir(sermon_id) / "transcript.json"
+
+
 def init_sermon_state(sermon_id: str) -> None:
     _ensure_dir(SERMONS_DIR)
     sermon_dir = sermon_state_dir(sermon_id)
@@ -61,6 +66,15 @@ def init_sermon_state(sermon_id: str) -> None:
         )
         decisions_file.write_text(_model_to_json_str(decisions))
 
+    transcript_file = transcript_path(sermon_id)
+    if not transcript_file.exists():
+        transcript = TranscriptDocument(
+            sermonId=sermon_id,
+            status="none",
+            segments=[],
+        )
+        transcript_file.write_text(_model_to_json_str(transcript))
+
 
 def load_analysis(sermon_id: str) -> AnalysisDocument:
     raw = analysis_path(sermon_id).read_text()
@@ -80,3 +94,22 @@ def load_decisions(sermon_id: str) -> DecisionsDocument:
 def save_decisions(decisions: DecisionsDocument) -> None:
     path = decisions_path(decisions.sermonId)
     path.write_text(_model_to_json_str(decisions))
+
+
+def load_transcript(sermon_id: str) -> TranscriptDocument:
+    path = transcript_path(sermon_id)
+    if not path.exists():
+        init_sermon_state(sermon_id)
+    raw = path.read_text()
+    if not raw.strip():
+        return TranscriptDocument(sermonId=sermon_id, status="none", segments=[])
+    try:
+        return _model_from_json(TranscriptDocument, raw)
+    except Exception:
+        data = json.loads(raw)
+        return TranscriptDocument(**data)
+
+
+def save_transcript(transcript: TranscriptDocument) -> None:
+    path = transcript_path(transcript.sermonId)
+    path.write_text(_model_to_json_str(transcript))

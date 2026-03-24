@@ -1,4 +1,4 @@
-# Apologia
+# Sermon-Wiki
 
 Project layout
 

@@ -1,6 +1,6 @@
 # API (backend)
 
-FastAPI service that powers the Apologia backend. Milestone A implements a
+FastAPI service that powers the Sermon-Wiki backend. Milestone A implements a
 simple flow to upload sermon PPTX files and list stored sermons (metadata +
 file path). Slide extraction and AI-assisted processing will be layered on
 later milestones.
