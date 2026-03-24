@@ -3,16 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Apologia – Sermon Refinement</title>
+  <title>Sermon-Wiki – Sermon Refinement</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <!-- Login Modal -->
   <div id="loginModal" class="modal active">
     <div class="modal-content">
-      <h2>Apologia</h2>
-      <p>Enter your name to get started</p>
+      <h2>Sermon-Wiki</h2>
+      <p>Enter your name and role to get started</p>
       <form id="loginForm">
+        <select id="loginRole" required>
+          <option value="pastor">Pastor</option>
+          <option value="user">Normal User</option>
+        </select>
         <input id="loginPastorName" type="text" placeholder="Your name" required autocomplete="off"/>
         <button type="submit" class="btn btn-primary">Sign In</button>
       </form>
@@ -22,13 +26,15 @@
   <!-- Navbar -->
   <nav id="navbar" class="navbar">
     <div class="navbar-left">
-      <h1 class="logo">Apologia</h1>
+      <h1 class="logo">Sermon-Wiki</h1>
     </div>
     <div class="navbar-center">
+      <span id="navbarRole" class="role-badge"></span>
       <span id="apiStatusDot" class="status-dot offline"></span>
       <span id="apiStatusText" class="api-status">Offline</span>
     </div>
     <div class="navbar-right">
+      <div id="dailyVerse" class="daily-verse"></div>
       <div class="user-menu">
         <button id="navbarUser" class="user-trigger" type="button"></button>
         <div id="userMenuDropdown" class="user-dropdown">
@@ -85,41 +91,103 @@
       </div>
     </div>
 
-    <!-- Review Page (hidden by default) -->
-    <div id="reviewPage" class="page" style="display: none;">
-      <div class="review-header">
-        <button id="backBtn" class="btn btn-secondary">← Back</button>
-        <h2 id="reviewTitle">Review</h2>
-        <div class="review-actions">
-          <button id="analyzeBtn" class="btn btn-secondary">Analyze Slide</button>
-          <button id="analyzeAllBtn" class="btn btn-secondary">Analyze All</button>
-          <button id="saveChangesBtn" class="btn btn-secondary">Save Changes</button>
-          <button id="generatePptxBtn" class="btn btn-primary">Generate PPTX</button>
-          <a id="downloadPptxLink" class="btn btn-success" style="display: none;">Download</a>
-        </div>
+    <!-- Normal User Page -->
+    <div id="userPage" class="page" style="display: none;">
+      <div class="page-header">
+        <h2>Sermon Library</h2>
       </div>
 
-      <div class="review-container">
-        <!-- Left: Slide Viewer -->
-        <div class="slide-viewer">
-          <div id="slidePreview" class="slide-preview">
-            <p>Slide preview will appear here</p>
+      <div class="user-filters">
+        <input id="userFilterName" type="text" placeholder="Search sermon name..." class="filter-input"/>
+        <input id="userFilterSeries" type="text" placeholder="Search series..." class="filter-input"/>
+        <input id="userFilterPastor" type="text" placeholder="Search pastor..." class="filter-input"/>
+        <input id="userFilterDate" type="text" placeholder="Search date..." class="filter-input"/>
+      </div>
+
+      <div class="sermons-table">
+        <div class="table-header table-header--user">
+          <div class="col col-name"><div class="col-label">Sermon Name</div></div>
+          <div class="col col-series"><div class="col-label">Series</div></div>
+          <div class="col col-date"><div class="col-label">Date</div></div>
+          <div class="col col-pastor"><div class="col-label">Pastor</div></div>
+          <div class="col col-actions"><div class="col-label">View</div></div>
+        </div>
+        <div id="userTableBody" class="table-body"></div>
+      </div>
+    </div>
+
+    <!-- Review Page (hidden by default) -->
+    <div id="reviewPage" class="page" style="display: none;">
+      <div class="review-page-shell">
+        <div class="review-header">
+          <button id="backBtn" class="btn btn-secondary">← Back</button>
+          <h2 id="reviewTitle">Review</h2>
+          <div class="review-actions">
+            <button id="analyzeBtn" class="btn btn-secondary">Analyze Slide</button>
+            <button id="analyzeAllBtn" class="btn btn-secondary">Analyze All</button>
+            <button id="saveChangesBtn" class="btn btn-secondary">Save Changes</button>
+            <button id="summarizeBtn" class="btn btn-primary" style="display: none;">Summarize</button>
+            <button id="addTranscriptBtn" class="btn btn-secondary" style="display: none;">Add Transcript</button>
+            <button id="generatePptxBtn" class="btn btn-primary">Generate PPTX</button>
+            <a id="downloadPptxLink" class="btn btn-success" style="display: none;">Download</a>
           </div>
-          <div class="slide-controls">
-            <button id="prevSlideBtn" class="btn btn-secondary">← Prev</button>
-            <span id="slideCounter" class="slide-counter">Slide 1 of 0</span>
-            <button id="nextSlideBtn" class="btn btn-secondary">Next →</button>
-          </div>
-          <div id="slideList" class="slide-list"></div>
         </div>
 
-        <!-- Right: Suggestions Panel -->
-        <div class="suggestions-panel">
-          <h3>Suggestions</h3>
-          <div id="suggestionsContainer" class="suggestions-container">
-            <p class="empty-state">Suggestions will appear here after analysis.</p>
+        <div class="review-content-shell">
+          <div class="review-container">
+            <!-- Left: Slide Viewer -->
+            <div class="slide-viewer">
+              <div id="slidePreview" class="slide-preview">
+                <p>Slide preview will appear here</p>
+              </div>
+              <div class="slide-controls">
+                <button id="prevSlideBtn" class="btn btn-secondary">← Prev</button>
+                <span id="slideCounter" class="slide-counter">Slide 1 of 0</span>
+                <button id="nextSlideBtn" class="btn btn-secondary">Next →</button>
+              </div>
+              <div id="slideList" class="slide-list"></div>
+            </div>
+
+            <!-- Right: Suggestions Panel -->
+            <div class="suggestions-panel">
+              <h3>Suggestions</h3>
+              <div id="suggestionsContainer" class="suggestions-container">
+                <p class="empty-state">Suggestions will appear here after analysis.</p>
+              </div>
+              <div id="reviewStatus" class="review-status"></div>
+            </div>
           </div>
-          <div id="reviewStatus" class="review-status"></div>
+
+          <div id="userDetailLayout" class="user-detail-layout" style="display: none;">
+            <div class="user-detail-top">
+              <section class="user-detail-card user-detail-card--panel">
+                <div class="user-detail-header">
+                  <h3>Presentation (PPT)</h3>
+                  <a id="userPptOpenLink" class="btn btn-sm btn-secondary" target="_blank" rel="noopener noreferrer">Open PPT</a>
+                </div>
+                <div id="userPresentationList" class="user-presentation-scroll">
+                  <p class="empty-state">Loading presentation...</p>
+                </div>
+              </section>
+
+              <section class="user-detail-card user-detail-card--panel">
+                <h3>Summary</h3>
+                <div id="userSummaryContent" class="user-detail-body user-summary-scroll">
+                  <p class="empty-state">Summary will appear here.</p>
+                </div>
+              </section>
+            </div>
+
+            <section class="user-detail-card user-transcript-card">
+              <button id="userTranscriptToggle" class="user-transcript-toggle" type="button" aria-expanded="false">
+                <span>Full Transcript</span>
+                <span id="userTranscriptToggleIcon">+</span>
+              </button>
+              <div id="userTranscriptContent" class="user-detail-body user-transcript-scroll is-collapsed">
+                <p class="empty-state">Transcript will appear here.</p>
+              </div>
+            </section>
+          </div>
         </div>
       </div>
     </div>
@@ -144,14 +212,24 @@
             <input id="seriesNameInput" type="text" name="seriesName" placeholder="e.g., Philippians"/>
           </div>
           <div class="form-group">
-            <label for="weekOrDateInput">Week/Date</label>
-            <input id="weekOrDateInput" type="date" name="weekOrDate"/>
+            <label for="weekOrDateInput">Sermon Date</label>
+            <input id="weekOrDateInput" type="date" name="sermonDate"/>
           </div>
         </div>
 
         <div class="form-group">
           <label for="pastorNameInput">Pastor Name</label>
           <input id="pastorNameInput" type="text" name="pastorName" placeholder="e.g., Pastor John"/>
+        </div>
+
+        <div class="form-group">
+          <label for="churchNameInput">Church Name</label>
+          <input id="churchNameInput" type="text" name="churchName" placeholder="e.g., Redeemer Church"/>
+        </div>
+
+        <div class="form-group">
+          <label for="youtubeUrlInput">YouTube URL (Optional)</label>
+          <input id="youtubeUrlInput" type="url" name="youtubeUrl" placeholder="https://www.youtube.com/watch?v=..."/>
         </div>
 
         <div class="form-group">
@@ -172,10 +250,36 @@
     </div>
   </div>
 
+  <!-- Transcript Modal -->
+  <div id="transcriptModal" class="modal">
+    <div class="modal-content modal-lg transcript-modal-content">
+      <div class="modal-header">
+        <h3>Add Transcript</h3>
+        <button id="closeTranscriptBtn" class="btn-close">✕</button>
+      </div>
+      <form id="transcriptForm" class="upload-form">
+        <div class="form-group">
+          <label for="transcriptTextInput">Transcript Text *</label>
+          <textarea
+            id="transcriptTextInput"
+            name="transcriptText"
+            class="transcript-textarea"
+            placeholder="Paste full transcript here..."
+            required
+          ></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" id="cancelTranscriptBtn" class="btn btn-secondary">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Transcript</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Overlay for modals -->
   <div id="modalOverlay" class="modal-overlay"></div>
   <div id="toastContainer" class="toast-container"></div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=20260324-1"></script>
 </body>
 </html>

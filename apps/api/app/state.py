@@ -1,9 +1,10 @@
 from datetime import datetime
+import json
 from pathlib import Path
 from typing import Type, TypeVar
 
 from .config import STORAGE_DIR
-from .schemas import AnalysisDocument, DecisionsDocument
+from .schemas import AnalysisDocument, DecisionsDocument, TranscriptDocument
 
 SERMONS_DIR = STORAGE_DIR / "sermons"
 
@@ -15,15 +16,11 @@ def _ensure_dir(path: Path) -> None:
 
 
 def _model_to_json_str(model) -> str:
-    if hasattr(model, "model_dump_json"):
-        return model.model_dump_json(indent=2)
-    return model.json(indent=2)
+    return model.model_dump_json(indent=2)
 
 
 def _model_from_json(model_cls: Type[T], raw: str) -> T:
-    if hasattr(model_cls, "model_validate_json"):
-        return model_cls.model_validate_json(raw)
-    return model_cls.parse_raw(raw)
+    return model_cls.model_validate_json(raw)
 
 
 def sermon_state_dir(sermon_id: str) -> Path:
@@ -36,6 +33,10 @@ def analysis_path(sermon_id: str) -> Path:
 
 def decisions_path(sermon_id: str) -> Path:
     return sermon_state_dir(sermon_id) / "decisions.json"
+
+
+def transcript_path(sermon_id: str) -> Path:
+    return sermon_state_dir(sermon_id) / "transcript.json"
 
 
 def init_sermon_state(sermon_id: str) -> None:
@@ -61,6 +62,15 @@ def init_sermon_state(sermon_id: str) -> None:
         )
         decisions_file.write_text(_model_to_json_str(decisions))
 
+    transcript_file = transcript_path(sermon_id)
+    if not transcript_file.exists():
+        transcript = TranscriptDocument(
+            sermonId=sermon_id,
+            status="none",
+            segments=[],
+        )
+        transcript_file.write_text(_model_to_json_str(transcript))
+
 
 def load_analysis(sermon_id: str) -> AnalysisDocument:
     raw = analysis_path(sermon_id).read_text()
@@ -80,3 +90,22 @@ def load_decisions(sermon_id: str) -> DecisionsDocument:
 def save_decisions(decisions: DecisionsDocument) -> None:
     path = decisions_path(decisions.sermonId)
     path.write_text(_model_to_json_str(decisions))
+
+
+def load_transcript(sermon_id: str) -> TranscriptDocument:
+    path = transcript_path(sermon_id)
+    if not path.exists():
+        init_sermon_state(sermon_id)
+    raw = path.read_text()
+    if not raw.strip():
+        return TranscriptDocument(sermonId=sermon_id, status="none", segments=[])
+    try:
+        return _model_from_json(TranscriptDocument, raw)
+    except Exception:
+        data = json.loads(raw)
+        return TranscriptDocument(**data)
+
+
+def save_transcript(transcript: TranscriptDocument) -> None:
+    path = transcript_path(transcript.sermonId)
+    path.write_text(_model_to_json_str(transcript))

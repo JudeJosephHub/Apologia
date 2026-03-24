@@ -7,14 +7,20 @@ const state = {
   decisionsBySlideId: {},
   selectedSermonId: null,
   selectedSlideNumber: null,
-  currentPastor: null,
+  currentUserName: null,
+  currentRole: "pastor",
+  reviewMode: null,
+  summaryText: "",
 };
 
 // DOM Elements
 const loginModal = document.getElementById("loginModal");
 const loginForm = document.getElementById("loginForm");
+const loginRole = document.getElementById("loginRole");
 const mainContent = document.getElementById("mainContent");
 const navbarUser = document.getElementById("navbarUser");
+const navbarRole = document.getElementById("navbarRole");
+const dailyVerse = document.getElementById("dailyVerse");
 const navbarLogoutBtn = document.getElementById("navbarLogoutBtn");
 const userMenuDropdown = document.getElementById("userMenuDropdown");
 const apiStatusDot = document.getElementById("apiStatusDot");
@@ -22,8 +28,10 @@ const apiStatusText = document.getElementById("apiStatusText");
 
 // Home Page Elements
 const homePage = document.getElementById("homePage");
+const userPage = document.getElementById("userPage");
 const uploadBtn = document.getElementById("uploadBtn");
 const sermonTableBody = document.getElementById("sermonTableBody");
+const userTableBody = document.getElementById("userTableBody");
 
 // Filter elements
 const filterName = document.getElementById("filterName");
@@ -31,6 +39,10 @@ const filterSeries = document.getElementById("filterSeries");
 const filterDate = document.getElementById("filterDate");
 const filterPastor = document.getElementById("filterPastor");
 const filterStatus = document.getElementById("filterStatus");
+const userFilterName = document.getElementById("userFilterName");
+const userFilterSeries = document.getElementById("userFilterSeries");
+const userFilterPastor = document.getElementById("userFilterPastor");
+const userFilterDate = document.getElementById("userFilterDate");
 
 // Upload Modal Elements
 const uploadModal = document.getElementById("uploadModal");
@@ -45,33 +57,55 @@ const pastorNameInput = document.getElementById("pastorNameInput");
 const cancelUploadBtn = document.getElementById("cancelUploadBtn");
 const closeUploadBtn = document.getElementById("closeUploadBtn");
 const modalOverlay = document.getElementById("modalOverlay");
+const transcriptModal = document.getElementById("transcriptModal");
+const transcriptForm = document.getElementById("transcriptForm");
+const transcriptTextInput = document.getElementById("transcriptTextInput");
+const closeTranscriptBtn = document.getElementById("closeTranscriptBtn");
+const cancelTranscriptBtn = document.getElementById("cancelTranscriptBtn");
 
 // Review Page Elements
 const reviewPage = document.getElementById("reviewPage");
 const backBtn = document.getElementById("backBtn");
 const reviewTitle = document.getElementById("reviewTitle");
+const reviewContainer = document.querySelector(".review-container");
 const analyzeBtn = document.getElementById("analyzeBtn");
 const analyzeAllBtn = document.getElementById("analyzeAllBtn");
 const saveChangesBtn = document.getElementById("saveChangesBtn");
+const summarizeBtn = document.getElementById("summarizeBtn");
+const addTranscriptBtn = document.getElementById("addTranscriptBtn");
 const generatePptxBtn = document.getElementById("generatePptxBtn");
 const downloadPptxLink = document.getElementById("downloadPptxLink");
 const slideList = document.getElementById("slideList");
+const slidePreview = document.getElementById("slidePreview");
 const suggestionsContainer = document.getElementById("suggestionsContainer");
+const suggestionsTitle = document.querySelector(".suggestions-panel h3");
 const reviewStatus = document.getElementById("reviewStatus");
 const slideCounter = document.getElementById("slideCounter");
 const prevSlideBtn = document.getElementById("prevSlideBtn");
 const nextSlideBtn = document.getElementById("nextSlideBtn");
 const toastContainer = document.getElementById("toastContainer");
+const userDetailLayout = document.getElementById("userDetailLayout");
+const userPresentationList = document.getElementById("userPresentationList");
+const userSummaryContent = document.getElementById("userSummaryContent");
+const userTranscriptContent = document.getElementById("userTranscriptContent");
+const userPptOpenLink = document.getElementById("userPptOpenLink");
+const userTranscriptToggle = document.getElementById("userTranscriptToggle");
+const userTranscriptToggleIcon = document.getElementById("userTranscriptToggleIcon");
 
 // Authentication
 function checkLogin() {
-  const pastorName = localStorage.getItem("pastorName");
-  if (pastorName) {
-    state.currentPastor = pastorName;
-    showMainContent(pastorName);
+  const savedName = localStorage.getItem("userName");
+  const savedRole = localStorage.getItem("userRole");
+  if (savedName && (savedRole === "pastor" || savedRole === "user")) {
+    state.currentUserName = savedName;
+    state.currentRole = savedRole;
+    showMainContent(savedName, savedRole);
     checkApi();
     loadSermons();
   } else {
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("pastorName");
     showLoginModal();
   }
 }
@@ -81,29 +115,95 @@ function showLoginModal() {
   mainContent.style.display = "none";
 }
 
-function showMainContent(pastorName) {
+function showMainContent(userName, role) {
   loginModal.classList.remove("active");
   mainContent.style.display = "grid";
-  navbarUser.textContent = pastorName;
-  pastorNameInput.value = pastorName;
+  navbarUser.textContent = userName;
+  navbarRole.textContent = role === "pastor" ? "Pastor" : "Normal User";
+  pastorNameInput.value = userName;
+  setRoleView(role);
+  loadDailyInspiration();
+}
+
+async function loadDailyInspiration() {
+  if (!dailyVerse) {
+    return;
+  }
+  dailyVerse.textContent = "Loading daily inspiration...";
+  try {
+    const inspiration = await apiFetch("/inspiration/daily");
+    const text = (inspiration.text || "").trim();
+    const citation = (inspiration.citation || "").trim();
+    dailyVerse.textContent = citation ? `${text} — ${citation}` : text;
+  } catch (error) {
+    dailyVerse.textContent = "";
+  }
+}
+
+function setRoleView(role) {
+  const isPastor = role === "pastor";
+  if (isPastor) {
+    homePage.style.display = "block";
+    userPage.style.display = "none";
+  } else {
+    homePage.style.display = "none";
+    reviewPage.style.display = "none";
+    userPage.style.display = "block";
+  }
+}
+
+function setReviewMode(mode) {
+  const isPastorMode = mode === "pastor";
+  reviewPage.classList.toggle("review-page--user", !isPastorMode);
+  reviewPage.classList.toggle("review-page--pastor", isPastorMode);
+  analyzeBtn.style.display = isPastorMode ? "inline-flex" : "none";
+  analyzeAllBtn.style.display = isPastorMode ? "inline-flex" : "none";
+  saveChangesBtn.style.display = isPastorMode ? "inline-flex" : "none";
+  generatePptxBtn.style.display = isPastorMode ? "inline-flex" : "none";
+  downloadPptxLink.style.display = "none";
+  summarizeBtn.style.display = isPastorMode ? "none" : "inline-flex";
+  addTranscriptBtn.style.display = isPastorMode ? "none" : "inline-flex";
+  suggestionsTitle.textContent = isPastorMode ? "Suggestions" : "Summary";
+  if (reviewContainer) {
+    reviewContainer.style.display = isPastorMode ? "grid" : "none";
+  }
+  if (userDetailLayout) {
+    userDetailLayout.style.display = isPastorMode ? "none" : "grid";
+  }
+}
+
+function setUserTranscriptExpanded(expanded) {
+  if (!userTranscriptContent || !userTranscriptToggle || !userTranscriptToggleIcon) {
+    return;
+  }
+  userTranscriptContent.classList.toggle("is-collapsed", !expanded);
+  userTranscriptToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+  userTranscriptToggleIcon.textContent = expanded ? "−" : "+";
 }
 
 loginForm.addEventListener("submit", (e) => {
   e.preventDefault();
-  const pastorName = document.getElementById("loginPastorName").value.trim();
-  if (pastorName) {
-    localStorage.setItem("pastorName", pastorName);
+  const userName = document.getElementById("loginPastorName").value.trim();
+  const role = loginRole.value;
+  if (userName) {
+    localStorage.setItem("userName", userName);
+    localStorage.setItem("userRole", role);
+    localStorage.setItem("pastorName", userName);
     document.getElementById("loginPastorName").value = "";
-    state.currentPastor = pastorName;
-    showMainContent(pastorName);
+    state.currentUserName = userName;
+    state.currentRole = role;
+    showMainContent(userName, role);
     checkApi();
     loadSermons();
   }
 });
 
 navbarLogoutBtn.addEventListener("click", () => {
+  localStorage.removeItem("userName");
+  localStorage.removeItem("userRole");
   localStorage.removeItem("pastorName");
-  state.currentPastor = null;
+  state.currentUserName = null;
+  state.currentRole = "pastor";
   userMenuDropdown.classList.remove("open");
   showLoginModal();
 });
@@ -132,7 +232,7 @@ document.addEventListener("keydown", (event) => {
 const logo = document.querySelector(".logo");
 if (logo) {
   logo.addEventListener("click", () => {
-    if (state.selectedSermonId) {
+    if (state.currentRole === "pastor" && state.selectedSermonId) {
       backToHome();
     }
   });
@@ -167,8 +267,10 @@ async function loadSermons() {
   try {
     state.sermons = await apiFetch("/sermons");
     renderSermonsList();
+    renderUserSermonsList();
   } catch (error) {
     sermonTableBody.innerHTML = '<div class="error">Unable to load sermons</div>';
+    userTableBody.innerHTML = '<div class="error">Unable to load sermons</div>';
   }
 }
 
@@ -210,13 +312,13 @@ function renderSermonsList() {
     const createdDate = new Date(sermon.createdAt).toLocaleDateString();
     
     row.innerHTML = `
-      <div class="col col-name">${sermon.sermonName || "-"}</div>
-      <div class="col col-series">${sermon.seriesName || "-"}</div>
-      <div class="col col-date">${sermon.weekOrDate || createdDate}</div>
-      <div class="col col-pastor">${sermon.pastorName || "-"}</div>
-      <div class="col col-status"><span class="status-badge">${sermon.status}</span></div>
+      <div class="col col-name">${escapeHtml(sermon.sermonName) || "-"}</div>
+      <div class="col col-series">${escapeHtml(sermon.seriesName) || "-"}</div>
+      <div class="col col-date">${escapeHtml(sermon.weekOrDate) || createdDate}</div>
+      <div class="col col-pastor">${escapeHtml(sermon.pastorName) || "-"}</div>
+      <div class="col col-status"><span class="status-badge">${escapeHtml(sermon.status)}</span></div>
       <div class="col col-actions">
-        <button class="btn btn-sm btn-primary review-action" data-id="${sermon.id}">Review</button>
+        <button class="btn btn-sm btn-primary review-action" data-id="${escapeHtml(sermon.id)}">Review</button>
       </div>
     `;
     
@@ -229,11 +331,65 @@ function renderSermonsList() {
   });
 }
 
+function renderUserSermonsList() {
+  userTableBody.innerHTML = "";
+
+  if (!state.sermons.length) {
+    userTableBody.innerHTML = '<div class="empty-message">No sermons available yet</div>';
+    return;
+  }
+
+  const nameFilter = (userFilterName.value || "").toLowerCase();
+  const seriesFilter = (userFilterSeries.value || "").toLowerCase();
+  const pastorFilter = (userFilterPastor.value || "").toLowerCase();
+  const dateFilter = (userFilterDate.value || "").toLowerCase();
+
+  const filteredSermons = state.sermons.filter((sermon) => {
+    const sermonDate = (sermon.weekOrDate || "").toLowerCase();
+    return (
+      (!nameFilter || (sermon.sermonName || "").toLowerCase().includes(nameFilter)) &&
+      (!seriesFilter || (sermon.seriesName || "").toLowerCase().includes(seriesFilter)) &&
+      (!pastorFilter || (sermon.pastorName || "").toLowerCase().includes(pastorFilter)) &&
+      (!dateFilter || sermonDate.includes(dateFilter))
+    );
+  });
+
+  if (!filteredSermons.length) {
+    userTableBody.innerHTML = '<div class="empty-message">No sermons match your search</div>';
+    return;
+  }
+
+  filteredSermons.forEach((sermon) => {
+    const row = document.createElement("div");
+    row.className = "table-row table-row--user";
+    const createdDate = new Date(sermon.createdAt).toLocaleDateString();
+
+    row.innerHTML = `
+      <div class="col col-name">${escapeHtml(sermon.sermonName) || "-"}</div>
+      <div class="col col-series">${escapeHtml(sermon.seriesName) || "-"}</div>
+      <div class="col col-date">${escapeHtml(sermon.weekOrDate) || createdDate}</div>
+      <div class="col col-pastor">${escapeHtml(sermon.pastorName) || "-"}</div>
+      <div class="col col-actions user-actions">
+        <button class="btn btn-sm btn-secondary user-view-action" type="button" data-id="${escapeHtml(sermon.id)}" data-name="${escapeHtml(sermon.sermonName) || "Sermon"}">View</button>
+      </div>
+    `;
+
+    const viewBtn = row.querySelector(".user-view-action");
+    viewBtn.addEventListener("click", () => {
+      navigateToUserSermon(sermon.id, sermon.sermonName || "Sermon");
+    });
+
+    userTableBody.appendChild(row);
+  });
+}
+
 // Upload Modal Management
 uploadBtn.addEventListener("click", openUploadModal);
 cancelUploadBtn.addEventListener("click", closeUploadModal);
 closeUploadBtn.addEventListener("click", closeUploadModal);
-modalOverlay.addEventListener("click", closeUploadModal);
+closeTranscriptBtn.addEventListener("click", closeTranscriptModal);
+cancelTranscriptBtn.addEventListener("click", closeTranscriptModal);
+modalOverlay.addEventListener("click", closeAllModals);
 
 // Filter listeners
 filterName.addEventListener("input", renderSermonsList);
@@ -241,6 +397,10 @@ filterSeries.addEventListener("input", renderSermonsList);
 filterDate.addEventListener("input", renderSermonsList);
 filterPastor.addEventListener("input", renderSermonsList);
 filterStatus.addEventListener("change", renderSermonsList);
+userFilterName.addEventListener("input", renderUserSermonsList);
+userFilterSeries.addEventListener("input", renderUserSermonsList);
+userFilterPastor.addEventListener("input", renderUserSermonsList);
+userFilterDate.addEventListener("input", renderUserSermonsList);
 
 function openUploadModal() {
   uploadModal.classList.add("active");
@@ -251,10 +411,31 @@ function openUploadModal() {
 
 function closeUploadModal() {
   uploadModal.classList.remove("active");
-  modalOverlay.classList.remove("active");
   uploadForm.reset();
   uploadStatus.textContent = "";
   weekOrDateInput.value = getNextSunday();
+  if (!transcriptModal.classList.contains("active")) {
+    modalOverlay.classList.remove("active");
+  }
+}
+
+function openTranscriptModal() {
+  transcriptModal.classList.add("active");
+  modalOverlay.classList.add("active");
+  transcriptTextInput.focus();
+}
+
+function closeTranscriptModal() {
+  transcriptModal.classList.remove("active");
+  transcriptForm.reset();
+  if (!uploadModal.classList.contains("active")) {
+    modalOverlay.classList.remove("active");
+  }
+}
+
+function closeAllModals() {
+  closeUploadModal();
+  closeTranscriptModal();
 }
 
 function getNextSunday() {
@@ -318,6 +499,9 @@ uploadForm.addEventListener("submit", async (e) => {
 
 // Navigation to Review Page
 function navigateToReview(sermonId, sermonName) {
+  state.reviewMode = "pastor";
+  setReviewMode("pastor");
+  state.summaryText = "";
   state.selectedSermonId = sermonId;
   state.slides = [];
   state.analysisBySlideId = {};
@@ -333,8 +517,37 @@ function navigateToReview(sermonId, sermonName) {
   loadSermonReview(sermonId);
 }
 
+function navigateToUserSermon(sermonId, sermonName) {
+  state.reviewMode = "user";
+  setReviewMode("user");
+  state.summaryText = "";
+  state.selectedSermonId = sermonId;
+  state.slides = [];
+  state.analysisBySlideId = {};
+  state.decisionsBySlideId = {};
+  state.selectedSlideNumber = null;
+  reviewTitle.textContent = sermonName;
+  homePage.style.display = "none";
+  userPage.style.display = "none";
+  reviewPage.style.display = "block";
+  reviewStatus.textContent = "Loading sermon...";
+  slideList.innerHTML = "";
+  slidePreview.innerHTML = '<p class="empty-state">Loading slides...</p>';
+  suggestionsContainer.innerHTML = '<p class="empty-state">Click Summarize to generate a sermon summary.</p>';
+  userPresentationList.innerHTML = '<p class="empty-state">Loading presentation...</p>';
+  userSummaryContent.innerHTML = '<p class="empty-state">Loading summary...</p>';
+  userTranscriptContent.innerHTML = '<p class="empty-state">Loading transcript...</p>';
+  userPptOpenLink.href = `${API_BASE}/sermons/${sermonId}/pptx`;
+  setUserTranscriptExpanded(false);
+  loadUserSermonSlides(sermonId);
+}
+
 function backToHome() {
-  homePage.style.display = "block";
+  if (state.currentRole === "pastor") {
+    homePage.style.display = "block";
+  } else {
+    userPage.style.display = "block";
+  }
   reviewPage.style.display = "none";
   state.selectedSermonId = null;
   state.slides = [];
@@ -346,6 +559,11 @@ function backToHome() {
   slidePreview.innerHTML = '<p class="empty-state">Select a slide</p>';
   suggestionsContainer.innerHTML = '<p class="empty-state">Select a slide</p>';
   slideCounter.textContent = "Slide 1 of 0";
+  state.summaryText = "";
+  userPresentationList.innerHTML = '<p class="empty-state">Presentation will appear here.</p>';
+  userSummaryContent.innerHTML = '<p class="empty-state">Summary will appear here.</p>';
+  userTranscriptContent.innerHTML = '<p class="empty-state">Transcript will appear here.</p>';
+  setUserTranscriptExpanded(false);
 }
 
 backBtn.addEventListener("click", backToHome);
@@ -370,6 +588,98 @@ async function loadSermonReview(sermonId) {
   } catch (error) {
     reviewStatus.textContent = "Unable to load review data: " + error.message;
   }
+}
+
+async function loadUserSermonSlides(sermonId) {
+  try {
+    const [slides, transcript] = await Promise.all([
+      apiFetch(`/sermons/${sermonId}/slides`),
+      apiFetch(`/sermons/${sermonId}/transcript`),
+    ]);
+    state.slides = slides;
+    state.selectedSlideNumber = slides.length ? slides[0].slideNumber : null;
+    renderUserPresentation();
+    renderUserTranscript(transcript);
+
+    const transcriptText = (transcript?.transcriptText || "").trim();
+    if (transcriptText) {
+      reviewStatus.textContent = "Generating summary from transcript...";
+      const summary = await apiFetch(`/sermons/${sermonId}/summary/from-transcript`, {
+        method: "POST",
+      });
+      state.summaryText = summary.summary || "";
+      renderUserSummary(state.summaryText);
+    } else {
+      state.summaryText = "";
+      renderUserSummary("");
+    }
+    reviewStatus.textContent = "";
+  } catch (error) {
+    reviewStatus.textContent = "Unable to load sermon: " + error.message;
+  }
+}
+
+function escapeHtml(text) {
+  return String(text || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function renderUserPresentation() {
+  userPresentationList.innerHTML = "";
+  if (!state.slides.length) {
+    userPresentationList.innerHTML = '<p class="empty-state">No slides found in this sermon.</p>';
+    return;
+  }
+
+  state.slides.forEach((slide) => {
+    const card = document.createElement("article");
+    card.className = "user-slide-item";
+    const safe = escapeHtml(slide.originalText || "");
+    const contentHtml = safe
+      ? safe.replaceAll("\n", "<br>")
+      : "<span class='empty-state'>No text on this slide.</span>";
+    card.innerHTML = `
+      <h4>Slide ${slide.slideNumber}</h4>
+      <div>${contentHtml}</div>
+    `;
+    userPresentationList.appendChild(card);
+  });
+}
+
+function renderUserSummary(summary) {
+  userSummaryContent.innerHTML = "";
+  if (!(summary || "").trim()) {
+    userSummaryContent.innerHTML =
+      '<p class="empty-state">Summary is not available yet. Click Summarize.</p>';
+    return;
+  }
+  const paragraph = document.createElement("p");
+  paragraph.style.whiteSpace = "pre-wrap";
+  paragraph.textContent = summary;
+  userSummaryContent.appendChild(paragraph);
+}
+
+function renderUserTranscript(transcriptDoc) {
+  userTranscriptContent.innerHTML = "";
+  const transcriptText = (transcriptDoc?.transcriptText || "").trim();
+  if (transcriptText) {
+    const paragraph = document.createElement("p");
+    paragraph.style.whiteSpace = "pre-wrap";
+    paragraph.textContent = transcriptText;
+    userTranscriptContent.appendChild(paragraph);
+    return;
+  }
+  const status = transcriptDoc?.status || "none";
+  const note = transcriptDoc?.note || "";
+  const empty = document.createElement("p");
+  empty.className = "empty-state";
+  empty.textContent =
+    status === "ready"
+      ? "Transcript is empty."
+      : `Transcript is not ready yet (status: ${status}). ${note}`.trim();
+  userTranscriptContent.appendChild(empty);
 }
 
 function mapAnalysis(slides) {
@@ -436,13 +746,23 @@ function renderSlideDetails() {
   slideCounter.textContent = `Slide ${slide.slideNumber} of ${state.slides.length}`;
   
   // Render slide preview with content
+  const safeSlideText = escapeHtml(slide.originalText || "").replaceAll("\n", "<br>");
   slidePreview.innerHTML = `
     <div class="slide-content-preview">
       <div class="slide-number-badge">Slide ${slide.slideNumber}</div>
-      <div class="slide-text-content">${slide.originalText || "<p class='empty-state'>No text content on this slide</p>"}</div>
+      <div class="slide-text-content">${safeSlideText || "<p class='empty-state'>No text content on this slide</p>"}</div>
     </div>
   `;
-  
+
+  if (state.reviewMode === "user") {
+    if (state.summaryText) {
+      renderSummary(state.summaryText);
+    } else {
+      suggestionsContainer.innerHTML = '<p class="empty-state">Click Summarize to generate a sermon summary.</p>';
+    }
+    return;
+  }
+
   const slideId = slide.slideId;
   const analysis = state.analysisBySlideId[slideId];
   const suggestions = analysis ? analysis.suggestions : [];
@@ -467,10 +787,10 @@ function renderSlideDetails() {
         ? decision.finalText
         : suggestion.proposed;
     card.innerHTML = `
-      <h4>${suggestion.category}</h4>
-      <p><strong>Original:</strong> ${suggestion.original}</p>
-      <p class="proposed-text"><strong>Proposed:</strong> ${proposedValue}</p>
-      ${suggestion.explanation ? `<p><strong>Note:</strong> ${suggestion.explanation}</p>` : ""}
+      <h4>${escapeHtml(suggestion.category)}</h4>
+      <p><strong>Original:</strong> ${escapeHtml(suggestion.original)}</p>
+      <p class="proposed-text"><strong>Proposed:</strong> ${escapeHtml(proposedValue)}</p>
+      ${suggestion.explanation ? `<p><strong>Note:</strong> ${escapeHtml(suggestion.explanation)}</p>` : ""}
     `;
     
     const actions = document.createElement("div");
@@ -548,6 +868,21 @@ function renderSlideDetails() {
   });
 }
 
+function renderSummary(summary) {
+  if (state.reviewMode === "user") {
+    renderUserSummary(summary);
+    return;
+  }
+  suggestionsContainer.innerHTML = "";
+  const card = document.createElement("div");
+  card.className = "suggestion-card";
+  const paragraph = document.createElement("p");
+  paragraph.style.whiteSpace = "pre-wrap";
+  paragraph.textContent = summary || "No summary available.";
+  card.appendChild(paragraph);
+  suggestionsContainer.appendChild(card);
+}
+
 function ensureDecisionMap(slideId) {
   if (!state.decisionsBySlideId[slideId]) {
     state.decisionsBySlideId[slideId] = {};
@@ -565,7 +900,7 @@ function updateProposedValue(card, text) {
   if (!proposed) {
     return;
   }
-  const safeText = text && text.trim() ? text : "—";
+  const safeText = text && text.trim() ? escapeHtml(text) : "—";
   proposed.innerHTML = `<strong>Proposed:</strong> ${safeText}`;
 }
 
@@ -597,6 +932,85 @@ nextSlideBtn.addEventListener("click", () => {
     state.selectedSlideNumber++;
     renderSlideList();
     renderSlideDetails();
+  }
+});
+
+if (userTranscriptToggle) {
+  userTranscriptToggle.addEventListener("click", () => {
+    const expanded = userTranscriptToggle.getAttribute("aria-expanded") === "true";
+    setUserTranscriptExpanded(!expanded);
+  });
+}
+
+summarizeBtn.addEventListener("click", async () => {
+  if (!state.selectedSermonId) {
+    reviewStatus.textContent = "Select a sermon first";
+    return;
+  }
+
+  reviewStatus.textContent = "Summarizing sermon...";
+  try {
+    const endpoint =
+      state.reviewMode === "user"
+        ? `/sermons/${state.selectedSermonId}/summary/from-transcript`
+        : `/sermons/${state.selectedSermonId}/summary`;
+    const summary = await apiFetch(endpoint, { method: "POST" });
+    state.summaryText = summary.summary || "";
+    renderSummary(state.summaryText);
+    reviewStatus.textContent = "";
+  } catch (error) {
+    const msg = String(error.message || "");
+    if (state.reviewMode === "user" && msg.includes("Transcript not ready")) {
+      reviewStatus.textContent =
+        "Transcript is not ready yet. Use Add Transcript to paste it manually, or wait for fetch.";
+      return;
+    }
+    reviewStatus.textContent = "Summarize failed: " + error.message;
+  }
+});
+
+addTranscriptBtn.addEventListener("click", async () => {
+  openTranscriptModal();
+});
+
+transcriptForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!state.selectedSermonId) {
+    reviewStatus.textContent = "Select a sermon first";
+    return;
+  }
+  const cleaned = (transcriptTextInput.value || "").trim();
+  if (!cleaned) {
+    reviewStatus.textContent = "Transcript text cannot be empty.";
+    return;
+  }
+
+  reviewStatus.textContent = "Saving transcript...";
+  try {
+    await apiFetch(`/sermons/${state.selectedSermonId}/transcript/manual`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transcriptText: cleaned, language: "en" }),
+    });
+    if (state.reviewMode === "user") {
+      renderUserTranscript({
+        transcriptText: cleaned,
+        status: "ready",
+        note: "Transcript provided manually.",
+      });
+    }
+    closeTranscriptModal();
+    reviewStatus.textContent = "Transcript saved. Generating summary...";
+    const summary = await apiFetch(
+      `/sermons/${state.selectedSermonId}/summary/from-transcript`,
+      { method: "POST" }
+    );
+    state.summaryText = summary.summary || "";
+    renderSummary(state.summaryText);
+    reviewStatus.textContent = "";
+    showToast("Transcript saved and summarized.");
+  } catch (error) {
+    reviewStatus.textContent = "Transcript save failed: " + error.message;
   }
 });
 
@@ -715,4 +1129,5 @@ generatePptxBtn.addEventListener("click", async () => {
 });
 
 // Initialize
+loadDailyInspiration();
 checkLogin();
