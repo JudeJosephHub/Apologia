@@ -4,3 +4,4 @@
 apps/api/.venv/
 apps/api/storage/
 apps/api/.env
+apps/api/apps/

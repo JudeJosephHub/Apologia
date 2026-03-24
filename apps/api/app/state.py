@@ -16,15 +16,11 @@ def _ensure_dir(path: Path) -> None:
 
 
 def _model_to_json_str(model) -> str:
-    if hasattr(model, "model_dump_json"):
-        return model.model_dump_json(indent=2)
-    return model.json(indent=2)
+    return model.model_dump_json(indent=2)
 
 
 def _model_from_json(model_cls: Type[T], raw: str) -> T:
-    if hasattr(model_cls, "model_validate_json"):
-        return model_cls.model_validate_json(raw)
-    return model_cls.parse_raw(raw)
+    return model_cls.model_validate_json(raw)
 
 
 def sermon_state_dir(sermon_id: str) -> Path:

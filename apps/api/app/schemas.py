@@ -1,10 +1,12 @@
 from datetime import datetime
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class Sermon(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     sermonName: str
     seriesName: Optional[str] = None
@@ -21,9 +23,6 @@ class Sermon(BaseModel):
     filePath: str
     originalFilename: str
     createdAt: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class SlideContent(BaseModel):

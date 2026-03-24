@@ -312,13 +312,13 @@ function renderSermonsList() {
     const createdDate = new Date(sermon.createdAt).toLocaleDateString();
     
     row.innerHTML = `
-      <div class="col col-name">${sermon.sermonName || "-"}</div>
-      <div class="col col-series">${sermon.seriesName || "-"}</div>
-      <div class="col col-date">${sermon.weekOrDate || createdDate}</div>
-      <div class="col col-pastor">${sermon.pastorName || "-"}</div>
-      <div class="col col-status"><span class="status-badge">${sermon.status}</span></div>
+      <div class="col col-name">${escapeHtml(sermon.sermonName) || "-"}</div>
+      <div class="col col-series">${escapeHtml(sermon.seriesName) || "-"}</div>
+      <div class="col col-date">${escapeHtml(sermon.weekOrDate) || createdDate}</div>
+      <div class="col col-pastor">${escapeHtml(sermon.pastorName) || "-"}</div>
+      <div class="col col-status"><span class="status-badge">${escapeHtml(sermon.status)}</span></div>
       <div class="col col-actions">
-        <button class="btn btn-sm btn-primary review-action" data-id="${sermon.id}">Review</button>
+        <button class="btn btn-sm btn-primary review-action" data-id="${escapeHtml(sermon.id)}">Review</button>
       </div>
     `;
     
@@ -365,12 +365,12 @@ function renderUserSermonsList() {
     const createdDate = new Date(sermon.createdAt).toLocaleDateString();
 
     row.innerHTML = `
-      <div class="col col-name">${sermon.sermonName || "-"}</div>
-      <div class="col col-series">${sermon.seriesName || "-"}</div>
-      <div class="col col-date">${sermon.weekOrDate || createdDate}</div>
-      <div class="col col-pastor">${sermon.pastorName || "-"}</div>
+      <div class="col col-name">${escapeHtml(sermon.sermonName) || "-"}</div>
+      <div class="col col-series">${escapeHtml(sermon.seriesName) || "-"}</div>
+      <div class="col col-date">${escapeHtml(sermon.weekOrDate) || createdDate}</div>
+      <div class="col col-pastor">${escapeHtml(sermon.pastorName) || "-"}</div>
       <div class="col col-actions user-actions">
-        <button class="btn btn-sm btn-secondary user-view-action" type="button" data-id="${sermon.id}" data-name="${sermon.sermonName || "Sermon"}">View</button>
+        <button class="btn btn-sm btn-secondary user-view-action" type="button" data-id="${escapeHtml(sermon.id)}" data-name="${escapeHtml(sermon.sermonName) || "Sermon"}">View</button>
       </div>
     `;
 
@@ -746,10 +746,11 @@ function renderSlideDetails() {
   slideCounter.textContent = `Slide ${slide.slideNumber} of ${state.slides.length}`;
   
   // Render slide preview with content
+  const safeSlideText = escapeHtml(slide.originalText || "").replaceAll("\n", "<br>");
   slidePreview.innerHTML = `
     <div class="slide-content-preview">
       <div class="slide-number-badge">Slide ${slide.slideNumber}</div>
-      <div class="slide-text-content">${slide.originalText || "<p class='empty-state'>No text content on this slide</p>"}</div>
+      <div class="slide-text-content">${safeSlideText || "<p class='empty-state'>No text content on this slide</p>"}</div>
     </div>
   `;
 
@@ -786,10 +787,10 @@ function renderSlideDetails() {
         ? decision.finalText
         : suggestion.proposed;
     card.innerHTML = `
-      <h4>${suggestion.category}</h4>
-      <p><strong>Original:</strong> ${suggestion.original}</p>
-      <p class="proposed-text"><strong>Proposed:</strong> ${proposedValue}</p>
-      ${suggestion.explanation ? `<p><strong>Note:</strong> ${suggestion.explanation}</p>` : ""}
+      <h4>${escapeHtml(suggestion.category)}</h4>
+      <p><strong>Original:</strong> ${escapeHtml(suggestion.original)}</p>
+      <p class="proposed-text"><strong>Proposed:</strong> ${escapeHtml(proposedValue)}</p>
+      ${suggestion.explanation ? `<p><strong>Note:</strong> ${escapeHtml(suggestion.explanation)}</p>` : ""}
     `;
     
     const actions = document.createElement("div");
@@ -899,7 +900,7 @@ function updateProposedValue(card, text) {
   if (!proposed) {
     return;
   }
-  const safeText = text && text.trim() ? text : "—";
+  const safeText = text && text.trim() ? escapeHtml(text) : "—";
   proposed.innerHTML = `<strong>Proposed:</strong> ${safeText}`;
 }
 

@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from datetime import datetime
 import hashlib
 import json
@@ -5,17 +6,17 @@ import os
 from pathlib import Path
 import re
 import shutil
-from typing import List, Optional
+from typing import AsyncGenerator, List, Optional
 from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import httpx
+from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pptx import Presentation
-from dotenv import load_dotenv
 
 from .bedrock import BedrockAgentError, analyze_slide_text
 from .config import STORAGE_DIR, UPLOAD_DIR
@@ -23,18 +24,18 @@ from .db import get_db, init_db
 from .schemas import (
     AnalysisDocument,
     DailyInspiration,
+    DecisionsDocument,
     Sermon,
     SlideAnalysis,
     SlideContent,
     SlideDecision,
     SlideDecisionPayload,
+    Suggestion,
     TranscriptDocument,
     TranscriptFetchPayload,
     TranscriptManualPayload,
     TranscriptSegment,
     VideoAttachPayload,
-    DecisionsDocument,
-    Suggestion,
 )
 from .state import (
     init_sermon_state,
@@ -46,6 +47,8 @@ from .state import (
     save_transcript,
 )
 from .transcript_providers import fetch_transcript_with_fallback
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 INSPIRATION_FALLBACK = [
     {
@@ -80,8 +83,14 @@ INSPIRATION_FALLBACK = [
     },
 ]
 
-app = FastAPI(title="Sermon-Wiki API", version="0.1.0")
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    init_db()
+    yield
+
+
+app = FastAPI(title="Sermon-Wiki API", version="0.2.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -89,11 +98,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-def startup_event() -> None:
-    init_db()
 
 
 @app.get("/health")
@@ -499,10 +503,6 @@ def _get_presentation(db, sermon_id: str) -> Presentation:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Invalid sermon PPTX: {exc}",
         ) from exc
-
-
-def _analyze_text_stub(text: str) -> List[Suggestion]:
-    return []
 
 
 @app.post("/sermons", response_model=Sermon, status_code=status.HTTP_201_CREATED)
