@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -107,7 +107,7 @@ def health_check() -> dict:
 
 @app.get("/inspiration/daily", response_model=DailyInspiration)
 def get_daily_inspiration(db=Depends(get_db)) -> DailyInspiration:
-    date_key = datetime.utcnow().date().isoformat()
+    date_key = datetime.now(timezone.utc).date().isoformat()
     row = db.execute(
         """
         SELECT date_key, kind, text, citation
@@ -135,7 +135,7 @@ def get_daily_inspiration(db=Depends(get_db)) -> DailyInspiration:
             generated.kind,
             generated.text,
             generated.citation,
-            datetime.utcnow().isoformat(),
+            datetime.now(timezone.utc).isoformat(),
         ),
     )
     db.commit()
@@ -253,22 +253,23 @@ def _build_transcript_summary(transcript_text: str) -> str:
     return summary
 
 
-def _extract_bible_references(text: str) -> List[str]:
-    books = (
-        "Genesis|Exodus|Leviticus|Numbers|Deuteronomy|Joshua|Judges|Ruth|"
-        "Samuel|Kings|Chronicles|Ezra|Nehemiah|Esther|Job|Psalms?|Proverbs|"
-        "Ecclesiastes|Song of Solomon|Isaiah|Jeremiah|Lamentations|Ezekiel|Daniel|"
-        "Hosea|Joel|Amos|Obadiah|Jonah|Micah|Nahum|Habakkuk|Zephaniah|Haggai|"
-        "Zechariah|Malachi|Matthew|Mark|Luke|John|Acts|Romans|Corinthians|Galatians|"
-        "Ephesians|Philippians|Colossians|Thessalonians|Timothy|Titus|Philemon|"
-        "Hebrews|James|Peter|Jude|Revelation"
-    )
-    pattern = re.compile(
-        rf"\b(?:[1-3]\s)?(?:{books})\s\d{{1,3}}:\d{{1,3}}(?:[-–]\d{{1,3}})?(?:,\d{{1,3}}(?:[-–]\d{{1,3}})?)*\b",
-        flags=re.IGNORECASE,
-    )
+_BIBLE_BOOKS = (
+    "Genesis|Exodus|Leviticus|Numbers|Deuteronomy|Joshua|Judges|Ruth|"
+    "Samuel|Kings|Chronicles|Ezra|Nehemiah|Esther|Job|Psalms?|Proverbs|"
+    "Ecclesiastes|Song of Solomon|Isaiah|Jeremiah|Lamentations|Ezekiel|Daniel|"
+    "Hosea|Joel|Amos|Obadiah|Jonah|Micah|Nahum|Habakkuk|Zephaniah|Haggai|"
+    "Zechariah|Malachi|Matthew|Mark|Luke|John|Acts|Romans|Corinthians|Galatians|"
+    "Ephesians|Philippians|Colossians|Thessalonians|Timothy|Titus|Philemon|"
+    "Hebrews|James|Peter|Jude|Revelation"
+)
+_BIBLE_REF_PATTERN = re.compile(
+    rf"\b(?:[1-3]\s)?(?:{_BIBLE_BOOKS})\s\d{{1,3}}:\d{{1,3}}(?:[-–]\d{{1,3}})?(?:,\d{{1,3}}(?:[-–]\d{{1,3}})?)*\b",
+    flags=re.IGNORECASE,
+)
 
-    matches = pattern.findall(text or "")
+
+def _extract_bible_references(text: str) -> List[str]:
+    matches = _BIBLE_REF_PATTERN.findall(text or "")
     refs: List[str] = []
     seen = set()
     for match in matches:
@@ -523,10 +524,11 @@ async def upload_sermon(
     _ensure_pptx(file)
 
     sermon_id = str(uuid4())
-    created_at = datetime.utcnow().isoformat()
+    created_at = datetime.now(timezone.utc).isoformat()
+    safe_filename = Path(file.filename).name if file.filename else "upload.pptx"
     sermon_dir = UPLOAD_DIR / sermon_id
     sermon_dir.mkdir(parents=True, exist_ok=True)
-    destination = sermon_dir / file.filename
+    destination = sermon_dir / safe_filename
     with destination.open("wb") as out_file:
         shutil.copyfileobj(file.file, out_file)
     _validate_pptx_file(destination)
@@ -556,8 +558,8 @@ async def upload_sermon(
             video_status,
             "none",
             "uploaded",
-            f"{sermon_id}/{file.filename}",
-            file.filename,
+            f"{sermon_id}/{safe_filename}",
+            safe_filename,
             created_at,
         ),
     )
@@ -578,8 +580,8 @@ async def upload_sermon(
         videoStatus=video_status,
         transcriptStatus="none",
         status="uploaded",
-        filePath=f"uploads/{sermon_id}/{file.filename}",
-        originalFilename=file.filename,
+        filePath=f"uploads/{sermon_id}/{safe_filename}",
+        originalFilename=safe_filename,
         createdAt=datetime.fromisoformat(created_at),
     )
 
@@ -662,7 +664,7 @@ def fetch_sermon_transcript(
     doc.videoId = video_id
     doc.language = result.language
     doc.source = result.provider
-    doc.fetchedAt = datetime.utcnow()
+    doc.fetchedAt = datetime.now(timezone.utc)
     doc.segments = result.segments
     doc.transcriptText = "\n".join(segment.text for segment in result.segments)
     doc.note = result.note
@@ -701,7 +703,7 @@ def save_manual_transcript(
         language=(payload.language or existing.language or "en"),
         status="ready",
         source="manual",
-        fetchedAt=datetime.utcnow(),
+        fetchedAt=datetime.now(timezone.utc),
         transcriptText=cleaned,
         segments=_transcript_to_segments(cleaned),
         note="Transcript provided manually.",
@@ -921,7 +923,7 @@ def save_slide_decisions(
     )
 
     doc = load_decisions(sermon_id)
-    doc.updatedAt = datetime.utcnow()
+    doc.updatedAt = datetime.now(timezone.utc)
     for idx, existing in enumerate(doc.slides):
         if existing.slideId == slide_id:
             doc.slides[idx] = decision

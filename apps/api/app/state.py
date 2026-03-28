@@ -1,14 +1,14 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 from pathlib import Path
-from typing import Type, TypeVar
+from typing import Type, TypeVar, Union
 
 from .config import STORAGE_DIR
 from .schemas import AnalysisDocument, DecisionsDocument, TranscriptDocument
 
 SERMONS_DIR = STORAGE_DIR / "sermons"
 
-T = TypeVar("T", AnalysisDocument, DecisionsDocument)
+T = TypeVar("T", AnalysisDocument, DecisionsDocument, TranscriptDocument)
 
 
 def _ensure_dir(path: Path) -> None:
@@ -48,7 +48,7 @@ def init_sermon_state(sermon_id: str) -> None:
     if not analysis_file.exists():
         analysis = AnalysisDocument(
             sermonId=sermon_id,
-            createdAt=datetime.utcnow(),
+            createdAt=datetime.now(timezone.utc),
             slides=[],
         )
         analysis_file.write_text(_model_to_json_str(analysis))
@@ -57,7 +57,7 @@ def init_sermon_state(sermon_id: str) -> None:
     if not decisions_file.exists():
         decisions = DecisionsDocument(
             sermonId=sermon_id,
-            updatedAt=datetime.utcnow(),
+            updatedAt=datetime.now(timezone.utc),
             slides=[],
         )
         decisions_file.write_text(_model_to_json_str(decisions))
@@ -99,11 +99,7 @@ def load_transcript(sermon_id: str) -> TranscriptDocument:
     raw = path.read_text()
     if not raw.strip():
         return TranscriptDocument(sermonId=sermon_id, status="none", segments=[])
-    try:
-        return _model_from_json(TranscriptDocument, raw)
-    except Exception:
-        data = json.loads(raw)
-        return TranscriptDocument(**data)
+    return _model_from_json(TranscriptDocument, raw)
 
 
 def save_transcript(transcript: TranscriptDocument) -> None:
