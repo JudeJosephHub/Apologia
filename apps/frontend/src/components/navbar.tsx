@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useAppStore } from "@/lib/store";
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const user = useAppStore((s) => s.user);
 
   return (
     <nav className="sticky top-0 z-50 bg-card/80 backdrop-blur-lg border-b border-border">
@@ -29,12 +31,18 @@ export function Navbar() {
             <Link href="/workbench" className="text-muted-foreground hover:text-foreground transition-colors">
               Workbench
             </Link>
-            <Link
-              href="/login"
-              className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
-            >
-              Sign In
-            </Link>
+            {user ? (
+              <span className="text-sm text-muted-foreground bg-secondary px-3 py-1.5 rounded-md">
+                {user.email}
+              </span>
+            ) : (
+              <Link
+                href="/login"
+                className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+              >
+                Sign In
+              </Link>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -68,12 +76,18 @@ export function Navbar() {
             <Link href="/workbench" className="block py-2 text-muted-foreground hover:text-foreground">
               Workbench
             </Link>
-            <Link
-              href="/login"
-              className="block bg-primary text-primary-foreground px-4 py-2 rounded-md text-center"
-            >
-              Sign In
-            </Link>
+            {user ? (
+              <span className="block py-2 text-sm text-muted-foreground">
+                {user.email}
+              </span>
+            ) : (
+              <Link
+                href="/login"
+                className="block bg-primary text-primary-foreground px-4 py-2 rounded-md text-center"
+              >
+                Sign In
+              </Link>
+            )}
           </div>
         )}
       </div>

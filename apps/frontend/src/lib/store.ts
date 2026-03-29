@@ -18,8 +18,9 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  user: null,
-  accessToken: null,
+  // Dev mode: auto-login (no Supabase configured)
+  user: { id: "dev-user-001", email: "judejosephsimon@gmail.com" },
+  accessToken: "dev-token",
   setUser: (user, token) => set({ user, accessToken: token }),
   logout: () => set({ user: null, accessToken: null }),
 

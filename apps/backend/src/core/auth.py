@@ -1,15 +1,36 @@
 """Auth utilities: JWT verification via Supabase, role checking, dependencies."""
 
+import os
 from typing import Optional
 
 from fastapi import Depends, HTTPException, Request, status
 
 from .supabase import get_supabase_client
 
+# Dev-mode default user (used when Supabase is not configured)
+_DEV_USER = {
+    "id": "dev-user-001",
+    "email": "judejosephsimon@gmail.com",
+    "role": "admin",
+}
+
+
+def _is_dev_mode() -> bool:
+    """True when Supabase credentials are not configured."""
+    return not os.getenv("SUPABASE_URL", "").strip()
+
 
 async def get_current_user(request: Request) -> dict:
-    """Extract and verify the Supabase JWT from the Authorization header."""
+    """Extract and verify the Supabase JWT from the Authorization header.
+
+    Falls back to a dev user when Supabase is not configured.
+    """
     auth_header = request.headers.get("Authorization")
+
+    # Dev mode: return default user when no Supabase configured
+    if _is_dev_mode():
+        return _DEV_USER
+
     if not auth_header or not auth_header.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
