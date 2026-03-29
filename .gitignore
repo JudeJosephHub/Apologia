@@ -1,7 +1,41 @@
+# OS
 .DS_Store
+
+# Python
 **/__pycache__/
 *.pyc
+.venv/
+
+# Node
+node_modules/
+.next/
+
+# Environment
+.env
+.env.local
+*.env
+
+# Backend
+apps/backend/storage/
+apps/backend/uploads/
+apps/backend/data/chroma/
+apps/backend/sermonopedia.db
+apps/backend/.env
+
+# Frontend
+apps/frontend/.env.local
+apps/frontend/.next/
+apps/frontend/node_modules/
+
+# Legacy (old structure)
 apps/api/.venv/
 apps/api/storage/
 apps/api/.env
 apps/api/apps/
+
+# IDE
+.vscode/settings.json
+
+# Misc
+*.log
+pnpm-lock.yaml
